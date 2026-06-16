@@ -1,0 +1,14 @@
+{
+  "name": "yt-voice-translate-poc",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "server": "node server/src/server.js",
+    "check": "node --check server/src/server.js"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  }
+}
+

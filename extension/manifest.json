@@ -1,0 +1,25 @@
+{
+  "manifest_version": 3,
+  "name": "YouTube Voice Translate PoC",
+  "version": "0.1.0",
+  "description": "Captures YouTube tab audio and plays a translated voice overlay from a local server.",
+  "permissions": [
+    "activeTab",
+    "offscreen",
+    "tabCapture"
+  ],
+  "host_permissions": [
+    "http://127.0.0.1/*",
+    "ws://127.0.0.1/*",
+    "https://www.youtube.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_title": "YouTube Voice Translate PoC"
+  }
+}
+
