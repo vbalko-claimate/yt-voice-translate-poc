@@ -9,7 +9,8 @@ const wss = new WebSocketServer({ host, port });
 wss.on("connection", (ws) => {
   const state = {
     targetLanguage: "cs",
-    mimeType: "audio/webm"
+    mimeType: "audio/webm",
+    tts: {}
   };
 
   ws.on("message", async (data, isBinary) => {
@@ -20,7 +21,15 @@ wss.on("connection", (ws) => {
         if (message.type === "config") {
           state.targetLanguage = message.targetLanguage || state.targetLanguage;
           state.mimeType = message.mimeType || state.mimeType;
-          ws.send(JSON.stringify({ type: "ready", state }));
+          state.tts = sanitizeTtsConfig(message.tts || {});
+          ws.send(JSON.stringify({
+            type: "ready",
+            state: {
+              targetLanguage: state.targetLanguage,
+              mimeType: state.mimeType,
+              ttsProvider: state.tts.provider || process.env.TTS_PROVIDER || "macos"
+            }
+          }));
         }
 
         return;
@@ -33,7 +42,8 @@ wss.on("connection", (ws) => {
       });
       const speech = await synthesizeSpeech({
         text: result.text,
-        language: state.targetLanguage
+        language: state.targetLanguage,
+        tts: state.tts
       });
 
       ws.send(JSON.stringify({
@@ -50,6 +60,20 @@ wss.on("connection", (ws) => {
     }
   });
 });
+
+function sanitizeTtsConfig(tts) {
+  return {
+    provider: tts.provider || "",
+    elevenLabsApiKey: tts.elevenLabsApiKey || "",
+    elevenLabsVoiceId: tts.elevenLabsVoiceId || "",
+    elevenLabsModelId: tts.elevenLabsModelId || "",
+    elevenLabsOutputFormat: tts.elevenLabsOutputFormat || "",
+    elevenLabsStability: tts.elevenLabsStability || "",
+    elevenLabsSimilarityBoost: tts.elevenLabsSimilarityBoost || "",
+    elevenLabsStyle: tts.elevenLabsStyle || "",
+    elevenLabsUseSpeakerBoost: Boolean(tts.elevenLabsUseSpeakerBoost)
+  };
+}
 
 wss.on("listening", () => {
   console.log(`yt-voice-translate-poc server listening on ws://${host}:${port}`);

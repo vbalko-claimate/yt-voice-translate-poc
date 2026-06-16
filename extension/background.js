@@ -48,7 +48,8 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         serverUrl: message.serverUrl,
         targetLanguage: message.targetLanguage,
         originalVolume: message.originalVolume,
-        voiceVolume: message.voiceVolume
+        voiceVolume: message.voiceVolume,
+        tts: message.tts
       });
 
       sendResponse({ ok: true });
@@ -69,4 +70,3 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 
   return false;
 });
-

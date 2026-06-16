@@ -33,6 +33,38 @@
         <input id="voiceVolume" type="range" min="0" max="1" step="0.05" value="1">
       </label>
 
+      <label>
+        TTS
+        <select id="ttsProvider">
+          <option value="">Server default</option>
+          <option value="external">Local Piper</option>
+          <option value="elevenlabs">ElevenLabs</option>
+          <option value="none">Text fallback</option>
+        </select>
+      </label>
+
+      <section id="elevenLabsFields" class="provider-fields">
+        <label>
+          ElevenLabs API key
+          <input id="elevenLabsApiKey" type="password" placeholder="sk_...">
+        </label>
+
+        <label>
+          Voice ID
+          <input id="elevenLabsVoiceId" placeholder="JBFqnCBsd6RMkjVDRZzb">
+        </label>
+
+        <label>
+          Model
+          <select id="elevenLabsModelId">
+            <option value="eleven_flash_v2_5">Flash v2.5</option>
+            <option value="eleven_turbo_v2_5">Turbo v2.5</option>
+            <option value="eleven_multilingual_v2">Multilingual v2</option>
+            <option value="eleven_v3">Eleven v3</option>
+          </select>
+        </label>
+      </section>
+
       <div class="actions">
         <button id="start">Start</button>
         <button id="stop">Stop</button>
@@ -44,4 +76,3 @@
     <script src="popup.js"></script>
   </body>
 </html>
-

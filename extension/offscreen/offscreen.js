@@ -172,7 +172,8 @@ async function start(message) {
     socket.send(JSON.stringify({
       type: "config",
       targetLanguage: message.targetLanguage || "cs",
-      mimeType: PCM_MIME_TYPE
+      mimeType: PCM_MIME_TYPE,
+      tts: message.tts || {}
     }));
   });
 

@@ -1,5 +1,5 @@
 body {
-  width: 280px;
+  width: 320px;
   margin: 0;
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   color: #172026;
@@ -23,6 +23,19 @@ label {
   gap: 5px;
   font-size: 12px;
   color: #4f5e68;
+}
+
+.provider-fields {
+  display: none;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid #d5dde4;
+  border-radius: 6px;
+  background: #ffffff;
+}
+
+.provider-fields.visible {
+  display: grid;
 }
 
 input,
@@ -63,4 +76,3 @@ button:first-child {
   color: #51606a;
   font-size: 12px;
 }
-

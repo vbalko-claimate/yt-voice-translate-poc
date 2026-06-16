@@ -1,16 +1,17 @@
-# YouTube Voice Translate PoC
+# YouTube Voice Translate
 
-Chrome extension + local server proof of concept for translated audio overlay on YouTube.
+Open-source Chrome extension + local companion services for translated audio overlay on YouTube.
 
-The goal is to validate the hard browser plumbing first:
+The project translates YouTube tab audio into spoken voice-over:
 
 - capture audio from the active YouTube tab with `chrome.tabCapture`
-- stream short audio chunks to a local process over WebSocket
+- stream 16 kHz PCM chunks to a local process over WebSocket
+- translate speech locally with Gemma 4 through `llama.cpp`
 - keep the original tab audio audible through an `AudioContext`
 - duck the original audio
-- play translated voice output over the video
+- synthesize and play translated voice output over the video
 
-By default the server uses a mock translator. For real local translation, run the Gemma runner in `local-runner/` and point the Node bridge at it with `GEMMA_TRANSLATOR_URL`.
+By default the server uses a mock translator. For real local translation, run Gemma Q4_0 with `llama.cpp` and point the Node bridge at it with `LLAMA_CPP_URL`.
 
 ## Target Architecture
 
@@ -19,8 +20,8 @@ YouTube tab audio
 -> Chrome tabCapture
 -> WebSocket chunks
 -> local server
--> Gemma 4B/12B audio-to-translated-text adapter
--> local or browser TTS
+-> Gemma 4 audio-to-translated-text adapter
+-> local Piper / ElevenLabs / platform TTS
 -> translated voice overlay
 ```
 
@@ -73,6 +74,57 @@ LLAMA_CPP_URL=http://127.0.0.1:8791 npm run server
 ```
 
 Then load the extension, open a YouTube video, and press Start. The browser captures YouTube tab audio as 16 kHz mono float32 PCM, sends 3-second chunks to local Gemma Q4_0, and speaks the translated text with browser TTS.
+
+## TTS Providers
+
+The extension popup can choose the TTS provider per session.
+
+### Local Piper
+
+Run the Piper server:
+
+```bash
+cd local-tts
+uv venv
+uv pip install -r requirements.txt
+mkdir -p voices
+curl -L -o voices/cs_CZ-jirka-medium.onnx https://huggingface.co/rhasspy/piper-voices/resolve/main/cs/cs_CZ/jirka/medium/cs_CZ-jirka-medium.onnx
+curl -L -o voices/cs_CZ-jirka-medium.onnx.json https://huggingface.co/rhasspy/piper-voices/resolve/main/cs/cs_CZ/jirka/medium/cs_CZ-jirka-medium.onnx.json
+PIPER_MODEL=voices/cs_CZ-jirka-medium.onnx PIPER_CONFIG=voices/cs_CZ-jirka-medium.onnx.json uv run uvicorn piper_server:app --host 127.0.0.1 --port 8792
+```
+
+Run the Node bridge with Piper:
+
+```bash
+LLAMA_CPP_URL=http://127.0.0.1:8791 TTS_PROVIDER=external TTS_URL=http://127.0.0.1:8792/synthesize npm run server
+```
+
+In the extension popup, choose `Local Piper`.
+
+### ElevenLabs
+
+In the extension popup, choose `ElevenLabs`, enter your API key and voice ID, then press Start. The API key is sent only to the local Node bridge for the active session; it is not written to extension storage or to the repository.
+
+Recommended model choices:
+
+- `Flash v2.5` for lowest latency.
+- `Turbo v2.5` for balanced latency and quality.
+- `Multilingual v2` for quality.
+
+You can also configure ElevenLabs from the shell instead of the popup:
+
+```bash
+LLAMA_CPP_URL=http://127.0.0.1:8791 \
+TTS_PROVIDER=elevenlabs \
+ELEVENLABS_API_KEY=... \
+ELEVENLABS_VOICE_ID=... \
+ELEVENLABS_MODEL_ID=eleven_flash_v2_5 \
+npm run server
+```
+
+### Platform Fallback
+
+`TTS_PROVIDER=macos` uses `say` and is useful only as a macOS smoke test. `speechSynthesis` in the extension remains a last-resort fallback if the server does not return audio.
 
 Alternative Hugging Face safetensors path:
 
@@ -133,3 +185,18 @@ and return:
 ```
 
 See `docs/LOCAL_INFERENCE.md` for the intended local inference plan.
+
+## Voice Training
+
+Do not train or fine-tune a local model on ElevenLabs output unless you have explicit permission from ElevenLabs for that use. Their current Prohibited Use Policy disallows using their services or output as input or datasets for training/fine-tuning ML or AI models.
+
+For a custom local voice, use recordings you own or have explicit rights to use for model training. A practical Piper voice dataset starts with clean single-speaker WAV segments plus transcripts; see `docs/VOICE_TRAINING.md`.
+
+## Roadmap
+
+- Measure real YouTube latency across translation and TTS providers.
+- Add streaming TTS playback instead of one audio file per translated chunk.
+- Add provider auto-detection for macOS, Windows, and Linux.
+- Add a first-class voice selector in the extension popup.
+- Improve chunking with VAD instead of fixed 3-second windows.
+- Document and automate custom Piper voice training.
