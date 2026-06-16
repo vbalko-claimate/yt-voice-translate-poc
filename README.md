@@ -51,6 +51,31 @@ Mock mode speaks Czech test messages whenever audio chunks arrive. That confirms
 
 ## Real Local Translation
 
+Recommended Q4_0 path:
+
+```bash
+brew install llama.cpp
+HF_TOKEN=... uv run hf download google/gemma-4-E2B-it-qat-q4_0-gguf gemma-4-E2B_q4_0-it.gguf gemma-4-E2B-it-mmproj.gguf
+llama-server \
+  --model "$HOME/.cache/huggingface/hub/models--google--gemma-4-E2B-it-qat-q4_0-gguf/snapshots/1894d1fc0a19d86697abd40483f5983c867df03f/gemma-4-E2B_q4_0-it.gguf" \
+  --mmproj "$HOME/.cache/huggingface/hub/models--google--gemma-4-E2B-it-qat-q4_0-gguf/snapshots/1894d1fc0a19d86697abd40483f5983c867df03f/gemma-4-E2B-it-mmproj.gguf" \
+  --host 127.0.0.1 \
+  --port 8791 \
+  --ctx-size 4096 \
+  --jinja \
+  --reasoning off
+```
+
+In another terminal, run the Node bridge:
+
+```bash
+LLAMA_CPP_URL=http://127.0.0.1:8791 npm run server
+```
+
+Then load the extension, open a YouTube video, and press Start. The browser captures YouTube tab audio as 16 kHz mono float32 PCM, sends 3-second chunks to local Gemma Q4_0, and speaks the translated text with browser TTS.
+
+Alternative Hugging Face safetensors path:
+
 Install and run the Gemma runner:
 
 ```bash
@@ -66,8 +91,6 @@ In another terminal, run the Node bridge:
 ```bash
 GEMMA_TRANSLATOR_URL=http://127.0.0.1:8790/translate npm run server
 ```
-
-Then load the extension, open a YouTube video, and press Start. The browser captures YouTube tab audio as 16 kHz mono float32 PCM, sends 3-second chunks to local Gemma, and speaks the translated text with browser TTS.
 
 Gemma model access may require accepting the Hugging Face model license before the first download.
 
