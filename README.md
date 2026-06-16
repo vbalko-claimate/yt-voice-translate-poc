@@ -103,7 +103,7 @@ In the extension popup, choose `Local Piper`.
 
 ### ElevenLabs
 
-In the extension popup, choose `ElevenLabs`, enter your API key and voice ID, then press Start. The API key is sent only to the local Node bridge for the active session; it is not written to extension storage or to the repository.
+In the extension popup, choose `ElevenLabs`, enter your API key, click `Load voices`, choose a voice from the dropdown, then press Start. The API key is sent only to the local Node bridge for the active session; it is not written to extension storage or to the repository. Voice lookup is proxied through `POST /elevenlabs/voices` on the local bridge so the key is not placed in a URL.
 
 Recommended model choices:
 

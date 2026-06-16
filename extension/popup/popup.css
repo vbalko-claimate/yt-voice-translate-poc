@@ -70,6 +70,13 @@ button:first-child {
   background: #0f6fff;
 }
 
+button.secondary {
+  width: 100%;
+  color: #172026;
+  border-color: #c7d1d9;
+  background: #f7f9fb;
+}
+
 #status {
   min-height: 18px;
   margin: 0;

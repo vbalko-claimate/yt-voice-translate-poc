@@ -1,10 +1,12 @@
+import { createServer } from "node:http";
 import { WebSocketServer } from "ws";
 import { translateAudioChunk } from "./translator.js";
 import { synthesizeSpeech } from "./tts.js";
 
 const port = Number(process.env.PORT || 8787);
 const host = process.env.HOST || "127.0.0.1";
-const wss = new WebSocketServer({ host, port });
+const server = createServer(handleHttpRequest);
+const wss = new WebSocketServer({ server });
 
 wss.on("connection", (ws) => {
   const state = {
@@ -75,11 +77,85 @@ function sanitizeTtsConfig(tts) {
   };
 }
 
-wss.on("listening", () => {
+server.listen(port, host, () => {
   console.log(`yt-voice-translate-poc server listening on ws://${host}:${port}`);
 });
 
-wss.on("error", (error) => {
+server.on("error", (error) => {
   console.error(error);
   process.exitCode = 1;
 });
+
+async function handleHttpRequest(request, response) {
+  try {
+    if (request.method === "OPTIONS") {
+      sendJson(response, 204, {});
+      return;
+    }
+
+    if (request.method === "GET" && request.url === "/health") {
+      sendJson(response, 200, { status: "ok" });
+      return;
+    }
+
+    if (request.method === "POST" && request.url === "/elevenlabs/voices") {
+      const body = await readJson(request);
+      const voices = await listElevenLabsVoices(body.apiKey);
+      sendJson(response, 200, { voices });
+      return;
+    }
+
+    sendJson(response, 404, { error: "not_found" });
+  } catch (error) {
+    sendJson(response, 500, {
+      error: error instanceof Error ? error.message : String(error)
+    });
+  }
+}
+
+async function listElevenLabsVoices(apiKey) {
+  if (!apiKey) {
+    throw new Error("ElevenLabs API key is required.");
+  }
+
+  const response = await fetch("https://api.elevenlabs.io/v1/voices", {
+    headers: {
+      "xi-api-key": apiKey
+    }
+  });
+
+  if (!response.ok) {
+    throw new Error(`ElevenLabs voices returned HTTP ${response.status}: ${await response.text()}`);
+  }
+
+  const payload = await response.json();
+  return (payload.voices || []).map((voice) => ({
+    voiceId: voice.voice_id,
+    name: voice.name,
+    category: voice.category || "",
+    description: voice.description || "",
+    previewUrl: voice.preview_url || "",
+    labels: voice.labels || {}
+  }));
+}
+
+async function readJson(request) {
+  const chunks = [];
+
+  for await (const chunk of request) {
+    chunks.push(chunk);
+  }
+
+  const raw = Buffer.concat(chunks).toString("utf8");
+  return raw ? JSON.parse(raw) : {};
+}
+
+function sendJson(response, statusCode, payload) {
+  response.writeHead(statusCode, {
+    "content-type": "application/json",
+    "access-control-allow-origin": "*",
+    "access-control-allow-headers": "content-type",
+    "access-control-allow-methods": "GET,POST,OPTIONS"
+  });
+  response.end(statusCode === 204 ? undefined : JSON.stringify(payload));
+}
