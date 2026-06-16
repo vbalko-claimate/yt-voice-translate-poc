@@ -1,0 +1,8 @@
+accelerate
+fastapi
+numpy
+pydantic
+torch
+transformers>=5.5.0
+uvicorn[standard]
+

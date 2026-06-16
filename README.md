@@ -10,7 +10,7 @@ The goal is to validate the hard browser plumbing first:
 - duck the original audio
 - play translated voice output over the video
 
-The current server intentionally uses a mock translator. It receives real audio chunks and sends back text messages. The extension speaks those messages with the browser's `speechSynthesis` API, so the first PoC can run without a multi-GB model or TTS engine.
+By default the server uses a mock translator. For real local translation, run the Gemma runner in `local-runner/` and point the Node bridge at it with `GEMMA_TRANSLATOR_URL`.
 
 ## Target Architecture
 
@@ -32,7 +32,7 @@ Install server dependencies:
 npm install
 ```
 
-Run the local server:
+Run the local server in mock mode:
 
 ```bash
 npm run server
@@ -47,7 +47,29 @@ Load the extension:
 5. Open a YouTube video.
 6. Click the extension icon and press Start.
 
-The first version will speak mock Czech voice-over messages whenever audio chunks arrive. That confirms the extension can capture YouTube audio, stream it locally, and play an overlay voice.
+Mock mode speaks Czech test messages whenever audio chunks arrive. That confirms the extension can capture YouTube audio, stream it locally, and play an overlay voice.
+
+## Real Local Translation
+
+Install and run the Gemma runner:
+
+```bash
+cd local-runner
+uv venv
+source .venv/bin/activate
+uv pip install -r requirements.txt
+MODEL_ID=google/gemma-4-E4B-it uvicorn gemma_hf_server:app --host 127.0.0.1 --port 8790
+```
+
+In another terminal, run the Node bridge:
+
+```bash
+GEMMA_TRANSLATOR_URL=http://127.0.0.1:8790/translate npm run server
+```
+
+Then load the extension, open a YouTube video, and press Start. The browser captures YouTube tab audio as 16 kHz mono float32 PCM, sends 3-second chunks to local Gemma, and speaks the translated text with browser TTS.
+
+Gemma model access may require accepting the Hugging Face model license before the first download.
 
 ## Replacing The Mock With Gemma
 
@@ -63,7 +85,7 @@ async function translateAudioChunk({ audio, mimeType, targetLanguage }) {
 
 For a real on-device setup, run Gemma in a local companion process and call it from this adapter. Keep the extension unchanged.
 
-To point the PoC server at a local model runner:
+To point the PoC server at any local model runner:
 
 ```bash
 GEMMA_TRANSLATOR_URL=http://127.0.0.1:8790/translate npm run server
@@ -74,7 +96,7 @@ The runner endpoint should accept:
 ```json
 {
   "audioBase64": "...",
-  "mimeType": "audio/webm;codecs=opus",
+  "mimeType": "audio/pcm;rate=16000;channels=1;format=f32le",
   "targetLanguage": "cs"
 }
 ```

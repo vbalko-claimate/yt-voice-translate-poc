@@ -17,7 +17,8 @@ export async function translateAudioChunk({ audio, mimeType, targetLanguage }) {
     meta: {
       chunkIndex,
       mimeType,
-      bytes: audio.length
+      bytes: audio.length,
+      provider: "mock"
     }
   };
 }
@@ -36,17 +37,13 @@ async function translateWithLocalRunner({ audio, mimeType, targetLanguage, url }
   });
 
   if (!response.ok) {
-    throw new Error(`Local Gemma runner returned HTTP ${response.status}`);
+    throw new Error(`Local Gemma runner returned HTTP ${response.status}: ${await response.text()}`);
   }
 
   const payload = await response.json();
 
-  if (!payload.text) {
-    throw new Error("Local Gemma runner response is missing text.");
-  }
-
   return {
-    text: payload.text,
+    text: payload.text || "",
     meta: payload.meta || {}
   };
 }

@@ -1,19 +1,15 @@
 let audioContext;
 let mediaStream;
-let mediaRecorder;
+let pcmProcessor;
 let socket;
 let originalGain;
 let speaking = false;
 const speechQueue = [];
-
-function getSupportedMimeType() {
-  const candidates = [
-    "audio/webm;codecs=opus",
-    "audio/webm"
-  ];
-
-  return candidates.find((type) => MediaRecorder.isTypeSupported(type)) || "";
-}
+const TARGET_SAMPLE_RATE = 16000;
+const CHUNK_SECONDS = 3;
+const PCM_MIME_TYPE = "audio/pcm;rate=16000;channels=1;format=f32le";
+let pcmBuffer = [];
+let pcmBufferLength = 0;
 
 async function captureTabAudio(streamId, originalVolume) {
   mediaStream = await navigator.mediaDevices.getUserMedia({
@@ -30,8 +26,21 @@ async function captureTabAudio(streamId, originalVolume) {
   const source = audioContext.createMediaStreamSource(mediaStream);
   originalGain = audioContext.createGain();
   originalGain.gain.value = originalVolume;
+  pcmProcessor = audioContext.createScriptProcessor(4096, 1, 1);
+
+  pcmProcessor.onaudioprocess = (event) => {
+    if (socket?.readyState !== WebSocket.OPEN) {
+      return;
+    }
+
+    const mono = event.inputBuffer.getChannelData(0);
+    const downsampled = downsampleFloat32(mono, audioContext.sampleRate, TARGET_SAMPLE_RATE);
+    queuePcm(downsampled);
+  };
 
   source.connect(originalGain).connect(audioContext.destination);
+  source.connect(pcmProcessor);
+  pcmProcessor.connect(audioContext.destination);
 }
 
 function speakNext(voiceVolume) {
@@ -57,24 +66,64 @@ function speakNext(voiceVolume) {
   speechSynthesis.speak(utterance);
 }
 
-function startRecorder(mimeType) {
-  mediaRecorder = new MediaRecorder(mediaStream, mimeType ? { mimeType } : undefined);
+function queuePcm(samples) {
+  pcmBuffer.push(samples);
+  pcmBufferLength += samples.length;
 
-  mediaRecorder.ondataavailable = async (event) => {
-    if (event.data.size === 0 || socket?.readyState !== WebSocket.OPEN) {
-      return;
+  const chunkSize = TARGET_SAMPLE_RATE * CHUNK_SECONDS;
+
+  while (pcmBufferLength >= chunkSize) {
+    const chunk = new Float32Array(chunkSize);
+    let offset = 0;
+
+    while (offset < chunkSize) {
+      const head = pcmBuffer[0];
+      const needed = chunkSize - offset;
+
+      if (head.length <= needed) {
+        chunk.set(head, offset);
+        offset += head.length;
+        pcmBuffer.shift();
+        pcmBufferLength -= head.length;
+      } else {
+        chunk.set(head.subarray(0, needed), offset);
+        pcmBuffer[0] = head.subarray(needed);
+        pcmBufferLength -= needed;
+        offset += needed;
+      }
     }
 
-    socket.send(await event.data.arrayBuffer());
-  };
+    socket.send(chunk.buffer);
+  }
+}
 
-  mediaRecorder.start(3000);
+function downsampleFloat32(input, inputSampleRate, outputSampleRate) {
+  if (inputSampleRate === outputSampleRate) {
+    return new Float32Array(input);
+  }
+
+  const ratio = inputSampleRate / outputSampleRate;
+  const outputLength = Math.floor(input.length / ratio);
+  const output = new Float32Array(outputLength);
+
+  for (let i = 0; i < outputLength; i += 1) {
+    const start = Math.floor(i * ratio);
+    const end = Math.min(Math.floor((i + 1) * ratio), input.length);
+    let sum = 0;
+
+    for (let j = start; j < end; j += 1) {
+      sum += input[j];
+    }
+
+    output[i] = sum / Math.max(1, end - start);
+  }
+
+  return output;
 }
 
 async function start(message) {
   stop();
 
-  const mimeType = getSupportedMimeType();
   const originalVolume = Number(message.originalVolume ?? 0.2);
   const voiceVolume = Number(message.voiceVolume ?? 1);
 
@@ -87,9 +136,8 @@ async function start(message) {
     socket.send(JSON.stringify({
       type: "config",
       targetLanguage: message.targetLanguage || "cs",
-      mimeType: mimeType || "audio/webm"
+      mimeType: PCM_MIME_TYPE
     }));
-    startRecorder(mimeType);
   });
 
   socket.addEventListener("message", (event) => {
@@ -103,11 +151,14 @@ async function start(message) {
 }
 
 function stop() {
-  if (mediaRecorder?.state === "recording") {
-    mediaRecorder.stop();
+  if (pcmProcessor) {
+    pcmProcessor.disconnect();
+    pcmProcessor.onaudioprocess = null;
   }
 
-  mediaRecorder = undefined;
+  pcmProcessor = undefined;
+  pcmBuffer = [];
+  pcmBufferLength = 0;
 
   if (socket?.readyState === WebSocket.OPEN || socket?.readyState === WebSocket.CONNECTING) {
     socket.close();
@@ -143,4 +194,3 @@ chrome.runtime.onMessage.addListener((message) => {
     stop();
   }
 });
-
