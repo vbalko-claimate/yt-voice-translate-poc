@@ -2,7 +2,8 @@ import { WebSocketServer } from "ws";
 import { translateAudioChunk } from "./translator.js";
 
 const port = Number(process.env.PORT || 8787);
-const wss = new WebSocketServer({ port });
+const host = process.env.HOST || "127.0.0.1";
+const wss = new WebSocketServer({ host, port });
 
 wss.on("connection", (ws) => {
   const state = {
@@ -44,5 +45,11 @@ wss.on("connection", (ws) => {
   });
 });
 
-console.log(`yt-voice-translate-poc server listening on ws://127.0.0.1:${port}`);
+wss.on("listening", () => {
+  console.log(`yt-voice-translate-poc server listening on ws://${host}:${port}`);
+});
 
+wss.on("error", (error) => {
+  console.error(error);
+  process.exitCode = 1;
+});
