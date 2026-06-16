@@ -1,5 +1,6 @@
 import { WebSocketServer } from "ws";
 import { translateAudioChunk } from "./translator.js";
+import { synthesizeSpeech } from "./tts.js";
 
 const port = Number(process.env.PORT || 8787);
 const host = process.env.HOST || "127.0.0.1";
@@ -30,10 +31,15 @@ wss.on("connection", (ws) => {
         mimeType: state.mimeType,
         targetLanguage: state.targetLanguage
       });
+      const speech = await synthesizeSpeech({
+        text: result.text,
+        language: state.targetLanguage
+      });
 
       ws.send(JSON.stringify({
         type: "translation",
         text: result.text,
+        speech,
         meta: result.meta
       }));
     } catch (error) {

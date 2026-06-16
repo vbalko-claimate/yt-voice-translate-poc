@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "server": "node server/src/server.js",
-    "check": "node --check server/src/server.js && node --check server/src/translator.js && python3 -m py_compile local-runner/gemma_hf_server.py"
+    "check": "node --check server/src/server.js && node --check server/src/translator.js && python3 -m py_compile local-runner/gemma_hf_server.py local-tts/piper_server.py"
   },
   "dependencies": {
     "ws": "^8.18.0"

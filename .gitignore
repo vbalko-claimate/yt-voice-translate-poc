@@ -1,6 +1,7 @@
 node_modules/
 __pycache__/
 *.pyc
+local-tts/voices/
 .DS_Store
 .env
 *.log

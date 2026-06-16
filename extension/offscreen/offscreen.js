@@ -3,8 +3,9 @@ let mediaStream;
 let pcmProcessor;
 let socket;
 let originalGain;
-let speaking = false;
-const speechQueue = [];
+let voiceGain;
+let playingVoice = false;
+const voiceQueue = [];
 const TARGET_SAMPLE_RATE = 16000;
 const CHUNK_SECONDS = 3;
 const PCM_MIME_TYPE = "audio/pcm;rate=16000;channels=1;format=f32le";
@@ -26,6 +27,8 @@ async function captureTabAudio(streamId, originalVolume) {
   const source = audioContext.createMediaStreamSource(mediaStream);
   originalGain = audioContext.createGain();
   originalGain.gain.value = originalVolume;
+  voiceGain = audioContext.createGain();
+  voiceGain.gain.value = 1;
   pcmProcessor = audioContext.createScriptProcessor(4096, 1, 1);
 
   pcmProcessor.onaudioprocess = (event) => {
@@ -39,31 +42,64 @@ async function captureTabAudio(streamId, originalVolume) {
   };
 
   source.connect(originalGain).connect(audioContext.destination);
+  voiceGain.connect(audioContext.destination);
   source.connect(pcmProcessor);
   pcmProcessor.connect(audioContext.destination);
 }
 
-function speakNext(voiceVolume) {
-  if (speaking || speechQueue.length === 0) {
-    return;
-  }
-
-  const text = speechQueue.shift();
+function speakText(text, voiceVolume) {
   const utterance = new SpeechSynthesisUtterance(text);
   utterance.lang = "cs-CZ";
   utterance.volume = voiceVolume;
   utterance.rate = 1.05;
-  utterance.onend = () => {
-    speaking = false;
-    speakNext(voiceVolume);
-  };
-  utterance.onerror = () => {
-    speaking = false;
-    speakNext(voiceVolume);
-  };
-
-  speaking = true;
   speechSynthesis.speak(utterance);
+}
+
+async function playNextVoice(voiceVolume) {
+  if (playingVoice || voiceQueue.length === 0) {
+    return;
+  }
+
+  playingVoice = true;
+
+  try {
+    const item = voiceQueue.shift();
+
+    if (item.speech?.audioBase64) {
+      const bytes = base64ToArrayBuffer(item.speech.audioBase64);
+      const decoded = await audioContext.decodeAudioData(bytes);
+      const source = audioContext.createBufferSource();
+      source.buffer = decoded;
+      voiceGain.gain.value = voiceVolume;
+      source.connect(voiceGain);
+      source.onended = () => {
+        playingVoice = false;
+        playNextVoice(voiceVolume);
+      };
+      source.start();
+      return;
+    }
+
+    speakText(item.text, voiceVolume);
+  } catch (_error) {
+    if (voiceQueue.length > 0) {
+      speakText(voiceQueue.shift().text, voiceVolume);
+    }
+  }
+
+  playingVoice = false;
+  playNextVoice(voiceVolume);
+}
+
+function base64ToArrayBuffer(value) {
+  const binary = atob(value);
+  const bytes = new Uint8Array(binary.length);
+
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+
+  return bytes.buffer;
 }
 
 function queuePcm(samples) {
@@ -144,8 +180,11 @@ async function start(message) {
     const payload = JSON.parse(event.data);
 
     if (payload.type === "translation" && payload.text) {
-      speechQueue.push(payload.text);
-      speakNext(voiceVolume);
+      voiceQueue.push({
+        text: payload.text,
+        speech: payload.speech
+      });
+      playNextVoice(voiceVolume);
     }
   });
 }
@@ -166,8 +205,8 @@ function stop() {
 
   socket = undefined;
   speechSynthesis.cancel();
-  speechQueue.length = 0;
-  speaking = false;
+  voiceQueue.length = 0;
+  playingVoice = false;
 
   if (mediaStream) {
     for (const track of mediaStream.getTracks()) {
@@ -183,6 +222,7 @@ function stop() {
 
   audioContext = undefined;
   originalGain = undefined;
+  voiceGain = undefined;
 }
 
 chrome.runtime.onMessage.addListener((message) => {
