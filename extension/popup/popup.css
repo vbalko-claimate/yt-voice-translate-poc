@@ -25,6 +25,16 @@ label {
   color: #4f5e68;
 }
 
+label.inline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+label.inline input {
+  width: auto;
+}
+
 .provider-fields {
   display: none;
   gap: 10px;

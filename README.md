@@ -105,6 +105,8 @@ In the extension popup, choose `Local Piper`.
 
 In the extension popup, choose `ElevenLabs`, enter your API key, click `Load voices`, choose a voice from the dropdown, then press Start. The API key is sent only to the local Node bridge for the active session; it is not written to extension storage or to the repository. Voice lookup is proxied through `POST /elevenlabs/voices` on the local bridge so the key is not placed in a URL.
 
+The popup persists non-secret settings in `chrome.storage.local`. If `Remember key locally` is enabled, the ElevenLabs API key is encrypted with AES-GCM before being written to `chrome.storage.local`; the non-extractable WebCrypto key is kept in the extension's IndexedDB.
+
 Recommended model choices:
 
 - `Flash v2.5` for lowest latency.

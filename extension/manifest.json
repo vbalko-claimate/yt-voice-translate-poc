@@ -6,6 +6,7 @@
   "permissions": [
     "activeTab",
     "offscreen",
+    "storage",
     "tabCapture"
   ],
   "host_permissions": [
@@ -22,4 +23,3 @@
     "default_title": "YouTube Voice Translate PoC"
   }
 }
-
